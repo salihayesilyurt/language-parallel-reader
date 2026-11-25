@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parallel Reader</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: calm study desk, a reader you return to every day
+   IDEA: a parallel-text edition with a highlighter pen: English page, Turkish facing page
+   PICTURE: the open paragraph itself, collocations marked in highlighter yellow
+   COLOUR and TYPE: white paper, black ink, highlighter #ffe600; Source Serif 4 text, Hanken Grotesk controls
+   LAYOUT: library/paste panel, then controls strip, EN and TR columns, collocation card; stacks on phones */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#161616);--ink:light-dark(#151515,#ececea);--mute:light-dark(#5d5d5a,#a3a39e);--line:light-dark(#d8d8d4,#33332f);--panel:light-dark(#f3f3f0,#1f1f1d);--hl:light-dark(#ffe600,#6b6200);--hlink:light-dark(#151515,#fff7a8);--now:light-dark(#e6eefc,#22304a)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Hanken Grotesk",system-ui,sans-serif;overflow-x:clip}
+.wrap{max-width:1240px;margin:0 auto;padding:clamp(20px,3vw,40px) max(4vw,16px)}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px;border-bottom:1px solid var(--line);padding-bottom:14px}
+h1{font:600 clamp(26px,3.4vw,36px)/1.05 "Source Serif 4",Georgia,serif;margin:0;text-wrap:balance}
+.src{color:var(--mute);font-size:14px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0}
+button,select,.file{font:500 15px "Hanken Grotesk",sans-serif;min-height:44px;padding:0 14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;cursor:pointer;display:inline-flex;align-items:center}
+button:hover,.file:hover{background:var(--panel)}
+button:focus-visible,select:focus-visible,mark:focus-visible,textarea:focus-visible,.file:focus-within{outline:3px solid #2f6fdf;outline-offset:2px}
+button.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button[aria-pressed=true]{background:var(--panel);border-color:var(--ink)}
+button:disabled{opacity:.4;cursor:default}
+.file input{position:absolute;width:1px;height:1px;opacity:0}
+.sp{flex:1}
+label.rate{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--mute)}
+input[type=range]{width:110px}
+details.add{margin-top:16px;border:1px solid var(--line);border-radius:10px;padding:4px 16px}
+details.add summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+textarea,input[type=text]{width:100%;font:16px/1.5 "Source Serif 4",serif;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+textarea{min-height:200px;resize:vertical}
+.hint{font-size:14px;color:var(--mute);margin:6px 0}
+.dots{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 18px}
+.dot{width:44px;height:36px;border-radius:6px;font-size:14px;min-height:0;padding:0;justify-content:center}
+.dot.on{background:var(--ink);color:var(--bg)}
+.dot.done{border-color:var(--ink);box-shadow:inset 0 -4px 0 var(--hl)}
+.sec{font-size:14px;color:var(--mute);margin:0 0 6px}
+.cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:clamp(18px,3vw,40px)}
+.page{font:400 19px/1.65 "Source Serif 4",Georgia,serif}
+.page h2{font:600 13px "Hanken Grotesk";color:var(--mute);margin:0 0 8px}
+.tr{border-left:1px solid var(--line);padding-left:clamp(14px,2vw,28px)}
+.tr.hidden .txt{filter:blur(6px);user-select:none;cursor:pointer}
+.s{cursor:pointer;border-radius:3px;transition:background .2s}
+.s:hover{background:var(--panel)}
+.s.now{background:var(--now)}
+mark{background:var(--hl);color:var(--hlink);padding:0 2px;border-radius:2px;cursor:pointer}
+mark.learned{background:none;color:inherit;box-shadow:inset 0 -3px 0 var(--hl)}
+.note{margin-top:18px;background:var(--panel);border-radius:10px;padding:14px 18px;font-size:15px}
+.note:empty{display:none}
+.card{margin-top:22px;border:1px solid var(--ink);border-radius:10px;padding:18px 20px;display:grid;gap:10px}
+.card h3{font:600 24px/1.2 "Source Serif 4",serif;margin:0}
+.tag{display:inline-block;font:500 13px "Hanken Grotesk";padding:2px 10px;border-radius:99px;border:1px solid var(--line);margin-left:8px;vertical-align:middle}
+.tag.f3{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.card p{margin:0}
+.card .ex{font:italic 17px/1.5 "Source Serif 4",serif}
+.card .row{display:flex;flex-wrap:wrap;gap:8px}
+.empty{color:var(--mute);margin-top:22px}
+.warn{font-size:14px;color:var(--mute);margin-top:6px}
+.err{color:#c0281b;font-size:14px}
+footer{margin-top:28px;border-top:1px solid var(--line);padding-top:12px;font-size:13px;color:var(--mute)}
+@media(max-width:760px){.cols,.two{grid-template-columns:minmax(0,1fr)}.tr{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:14px}.page{font-size:18px}}
+@media(prefers-reduced-motion:reduce){.s{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1 id="title">Parallel Reader</h1>
+  <span class="src">İngilizce–Türkçe paralel okuma ve dinleme</span>
+</header>
+
+<div class="bar">
+  <label for="lib" class="src">Metin</label>
+  <select id="lib" aria-label="Kayıtlı metinler"></select>
+  <label class="file">JSON paket yükle<input type="file" id="pack" accept=".json,application/json"></label>
+  <button id="del">Bu metni sil</button>
+</div>
+
+<details class="add" id="addBox">
+  <summary>Yeni metin ekle (yapıştır)</summary>
+  <input type="text" id="newTitle" placeholder="Başlık, ör. Makalem 2024" aria-label="Başlık">
+  <div class="two" style="margin-top:10px">
+    <div><label for="newEn" class="hint">İngilizce metin</label><textarea id="newEn" placeholder="Paragrafları boş satırla ayırın."></textarea></div>
+    <div><label for="newTr" class="hint">Türkçe metin (isteğe bağlı)</label><textarea id="newTr" placeholder="Aynı paragraf sırasıyla."></textarea></div>
+  </div>
+  <p class="hint">Paragraflar boş satırla ayrılır. PDF'ten kopyalanan satır sonları ve satır sonu tireleri otomatik birleştirilir. Metin yalnızca bu tarayıcıda saklanır, hiçbir yere gönderilmez.</p>
+  <p class="err" id="addErr"></p>
+  <div class="bar"><button class="primary" id="addBtn">Ekle ve aç</button></div>
+</details>
+
+<div class="bar" role="toolbar" aria-label="Dinleme">
+  <button class="primary" id="playEn">▶ İngilizce</button>
+  <button id="playTr">▶ Türkçe</button>
+  <button id="playBoth">▶ Önce EN, sonra TR</button>
+  <button id="playAlt">▶ Cümle cümle EN/TR</button>
+  <button id="stop">■ Durdur</button>
+  <label class="rate">Hız <input type="range" id="rate" min="0.6" max="1.2" step="0.05" value="0.9"><span id="rateV">0.9</span></label>
+  <span class="sp"></span>
+  <button id="hideTr" aria-pressed="false">Türkçeyi gizle</button>
+</div>
+<div class="warn" id="voiceWarn" hidden></div>
+
+<nav class="dots" id="dots" aria-label="Paragraflar"></nav>
+<p class="sec" id="sec"></p>
+
+<div class="cols">
+  <section class="page" aria-label="İngilizce metin"><h2>ENGLISH · bir cümleye dokun, o cümleyi okusun</h2><div id="en" class="txt"></div></section>
+  <section class="page tr" id="trBox" aria-label="Türkçe metin"><h2>TÜRKÇE</h2><div id="tr" class="txt"></div></section>
+</div>
+
+<div class="note" id="note"></div>
+<div id="cardBox"></div>
+
+<div class="bar">
+  <button id="prev">← Önceki</button>
+  <button id="next" class="primary">Sonraki →</button>
+  <span class="sp"></span>
+  <button id="done" aria-pressed="false">Bu paragrafı bitirdim</button>
+</div>
+
+<footer>Örnek metin bu uygulama için yazılmıştır. Sesler tarayıcının kendi sesleridir; Türkçe ses yoksa işletim sistemi ayarlarından eklenebilir. Kalıp kartları ve notlar JSON paketle gelir; biçim için README'ye bakın.</footer>
+</div>
+
+<script>
+{
+const F={3:"Çok yaygın",2:"Yaygın",1:"Üslup tercihi, daha seyrek"};
+const SAMPLE={id:"sample",title:"Örnek: Learning from few examples",paragraphs:[
+{sec:"Örnek metin",en:"Most machine learning models need thousands of labeled examples before they perform well. In many engineering settings, however, such data is expensive to collect or simply does not exist. Few-shot learning addresses this gap by training models that can adapt from only a handful of examples.",tr:"Çoğu makine öğrenimi modeli iyi performans göstermeden önce binlerce etiketli örneğe ihtiyaç duyar. Ancak birçok mühendislik ortamında bu tür verileri toplamak pahalıdır ya da bu veriler hiç yoktur. Az örnekle öğrenme, yalnızca bir avuç örnekten uyum sağlayabilen modeller eğiterek bu boşluğu kapatır.",note:"<b>Not örneği.</b> Paket dosyasında her paragrafa böyle bir dil notu eklenebilir.",
+c:[{p:"addresses this gap",tr:"bu boşluğu kapatmak / bu eksikliği gidermek",f:3,u:"<i>address a gap / problem / limitation</i> akademik yazıda temel kalıp.",alt:"fills this gap, tackles this problem",ex:"This study addresses a gap in the literature on fault diagnosis."},
+{p:"a handful of examples",tr:"bir avuç örnek",f:3,u:"Az örnekle öğrenme literatüründe çok yaygın.",alt:"a few examples",ex:"The model adapts from only a handful of labeled samples."}]},
+{sec:"Örnek metin",en:"The idea is simple. Instead of learning one task well, the model learns how to learn new tasks quickly. This shift turns data scarcity from a barrier into a design assumption.",tr:"Fikir basittir. Model, tek bir görevi iyi öğrenmek yerine yeni görevleri hızla öğrenmeyi öğrenir. Bu değişim, veri kıtlığını bir engel olmaktan çıkarıp bir tasarım varsayımına dönüştürür.",note:"",c:[{p:"turns data scarcity from a barrier into a design assumption",tr:"X'i Y olmaktan çıkarıp Z'ye dönüştürmek",f:2,u:"<i>turn X from A into B</i>: bakış açısı değişimini anlatan etkili bir yapı.",alt:"reframes X as B",ex:"Uncertainty estimates turn model errors from silent failures into visible warnings."}]}
+]};
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+const rich=s=>esc(s).replace(/&lt;(\/?)(b|i|u)&gt;/g,"<$1$2>");
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}};
+
+let docs=store.get("pr_docs",[]);
+let cur=store.get("pr_cur","sample");
+let prog=store.get("pr_prog",{});
+let doc,idx=0,curCard=null;
+
+const all=()=>[SAMPLE,...docs];
+const P=()=>doc.paragraphs;
+const pg=()=>prog[doc.id]||(prog[doc.id]={idx:0,done:[],learned:[]});
+const saveProg=()=>store.set("pr_prog",prog);
+
+function clean(t){return t.replace(/\r/g,"").replace(/-\n(?=[a-zçğıöşü])/g,"").split(/\n\s*\n/).map(p=>p.replace(/\s*\n\s*/g," ").replace(/\s{2,}/g," ").trim()).filter(Boolean)}
+const split=t=>t.split(/(?<=[.!?])\s+(?=[A-ZÇĞİÖŞÜ“"(])/);
+
+function validPack(o){
+  if(!o||!Array.isArray(o.paragraphs)||!o.paragraphs.length)throw new Error("Pakette 'paragraphs' listesi yok.");
+  return {title:String(o.title||"Adsız paket"),paragraphs:o.paragraphs.map(p=>({sec:String(p.sec||""),en:String(p.en||""),tr:String(p.tr||""),note:String(p.note||""),
+    c:Array.isArray(p.c)?p.c.filter(c=>c&&c.p).map(c=>({p:String(c.p),tr:String(c.tr||""),f:[1,2,3].includes(+c.f)?+c.f:2,u:String(c.u||""),alt:String(c.alt||""),ex:String(c.ex||""),src:c.src&&/^https:\/\//.test(c.src.u||"")?{t:String(c.src.t||c.src.u),u:String(c.src.u)}:null})):[]})).filter(p=>p.en)};
+}
+function addDoc(d){d.id="d"+Date.now();docs.push(d);if(!store.set("pr_docs",docs)){$("addErr").textContent="Tarayıcı depolaması dolu ya da kapalı; metin yalnızca bu oturumda açık kalacak."}open(d.id)}
+
+function lib(){$("lib").innerHTML=all().map(d=>`<option value="${esc(d.id)}" ${d.id===doc.id?"selected":""}>${esc(d.title)}</option>`).join("");$("del").disabled=doc.id==="sample"}
+function open(id){doc=all().find(d=>d.id===id)||SAMPLE;cur=doc.id;store.set("pr_cur",cur);idx=Math.min(pg().idx||0,P().length-1);lib();render()}
+
+function markup(sent,cols){
+  let h=esc(sent);
+  cols.forEach((c,i)=>{const k=esc(c.p);const j=h.indexOf(k);if(j>-1){const key=idx+":"+i;h=h.slice(0,j)+`<mark tabindex="0" data-i="${i}" class="${pg().learned.includes(key)?"learned":""}">${k}</mark>`+h.slice(j+k.length)}});
+  return h;
+}
+function render(){
+  const p=P()[idx];
+  $("title").textContent=doc.title;
+  $("sec").textContent=`${p.sec?p.sec+" · ":""}Paragraf ${idx+1} / ${P().length}`;
+  $("en").innerHTML=split(p.en).map((s,i)=>`<span class="s" data-l="en">${markup(s,p.c)}</span> `).join("");
+  $("tr").innerHTML=p.tr?split(p.tr).map(s=>`<span class="s" data-l="tr">${esc(s)}</span> `).join(""):`<span class="src">Bu paragraf için Türkçe metin yok.</span>`;
+  $("note").innerHTML=rich(p.note);
+  const g=pg();
+  $("dots").innerHTML=P().map((_,i)=>`<button class="dot ${i===idx?"on":""} ${g.done.includes(i)?"done":""}" data-i="${i}" aria-label="Paragraf ${i+1}">${i+1}</button>`).join("");
+  $("done").setAttribute("aria-pressed",g.done.includes(idx));
+  $("done").textContent=g.done.includes(idx)?"✓ Bitirildi":"Bu paragrafı bitirdim";
+  $("prev").disabled=idx===0;$("next").disabled=idx===P().length-1;
+  ["playTr","playBoth","playAlt"].forEach(b=>$(b).disabled=!p.tr);
+  curCard=null;
+  $("cardBox").innerHTML=p.c.length?`<p class="empty">Bu paragrafta ${p.c.length} kalıp var. Sarı işaretlilere dokun.</p>`:"";
+}
+function card(i){
+  const c=P()[idx].c[i],key=idx+":"+i,L=pg().learned;curCard=i;
+  $("cardBox").innerHTML=`<div class="card" aria-live="polite">
+    <h3>${esc(c.p)} <span class="tag ${c.f===3?"f3":""}">${F[c.f]}</span></h3>
+    ${c.tr?`<p><b>Anlamı:</b> ${rich(c.tr)}</p>`:""}
+    ${c.u?`<p><b>Kullanım:</b> ${rich(c.u)}</p>`:""}
+    ${c.alt?`<p><b>Alternatifler:</b> ${rich(c.alt)}</p>`:""}
+    ${c.ex?`<p class="ex">“${esc(c.ex)}”</p>`:""}
+    ${c.src?`<p><a href="${esc(c.src.u)}" target="_blank" rel="noopener">${esc(c.src.t)}</a></p>`:c.ex?`<p class="warn">Örnek cümle bir şablondur, alıntı değildir.</p>`:""}
+    <div class="row"><button id="sayP">▶ Kalıbı dinle</button>${c.ex?`<button id="sayX">▶ Örneği dinle</button>`:""}<button id="lrn" aria-pressed="${L.includes(key)}">${L.includes(key)?"✓ Öğrendim":"Öğrendim olarak işaretle"}</button></div></div>`;
+  $("sayP").onclick=()=>speak([{t:c.p,l:"en"}]);
+  if(c.ex)$("sayX").onclick=()=>speak([{t:c.ex,l:"en"}]);
+  $("lrn").onclick=()=>{const j=L.indexOf(key);j>-1?L.splice(j,1):L.push(key);saveProg();const ci=curCard;render();card(ci)};
+}
+
+/* speech */
+const synth=window.speechSynthesis;let voices=[];
+const loadV=()=>{voices=synth?synth.getVoices():[];const w=$("voiceWarn");
+  if(!synth){w.hidden=false;w.textContent="Bu tarayıcı sesli okumayı desteklemiyor. Chrome, Edge veya Safari deneyin."}
+  else if(voices.length&&!voices.some(v=>v.lang.toLowerCase().startsWith("tr"))){w.hidden=false;w.textContent="Tarayıcıda Türkçe ses bulunamadı. İşletim sistemi ayarlarından Türkçe ses eklenebilir."}else w.hidden=true};
+if(synth){loadV();synth.onvoiceschanged=loadV}
+const pick=l=>{const pref=l==="en"?["en-gb","en-us","en"]:["tr-tr","tr"];for(const p of pref){const v=voices.find(v=>v.lang.replace("_","-").toLowerCase().startsWith(p));if(v)return v}return null};
+const clearNow=()=>document.querySelectorAll(".s.now").forEach(e=>e.classList.remove("now"));
+function speak(items){
+  if(!synth)return;synth.cancel();clearNow();
+  const smooth=matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth";
+  items.forEach(it=>{const u=new SpeechSynthesisUtterance(it.t);const v=pick(it.l);if(v)u.voice=v;u.lang=it.l==="en"?"en-GB":"tr-TR";u.rate=+$("rate").value;
+    u.onstart=()=>{clearNow();if(it.el){it.el.classList.add("now");it.el.scrollIntoView({block:"nearest",behavior:smooth})}};
+    u.onend=()=>{if(it.el)it.el.classList.remove("now")};synth.speak(u)});
+}
+const sents=l=>[...document.querySelectorAll(`.s[data-l="${l}"]`)].map(el=>({t:el.textContent,l,el}));
+$("playEn").onclick=()=>speak(sents("en"));
+$("playTr").onclick=()=>speak(sents("tr"));
+$("playBoth").onclick=()=>speak([...sents("en"),...sents("tr")]);
+$("playAlt").onclick=()=>{const e=sents("en"),t=sents("tr"),q=[];for(let i=0;i<Math.max(e.length,t.length);i++){if(e[i])q.push(e[i]);if(t[i])q.push(t[i])}speak(q)};
+$("stop").onclick=()=>{if(synth)synth.cancel();clearNow()};
+$("rate").oninput=e=>$("rateV").textContent=String(+(+e.target.value).toFixed(2));
+
+/* library */
+$("lib").onchange=e=>open(e.target.value);
+$("del").onclick=()=>{if(doc.id==="sample")return;if($("del").dataset.c!=="1"){$("del").dataset.c="1";$("del").textContent="Emin misin? Tekrar bas";return}
+  docs=docs.filter(d=>d.id!==doc.id);delete prog[doc.id];store.set("pr_docs",docs);saveProg();$("del").dataset.c="";$("del").textContent="Bu metni sil";open("sample")};
+$("addBtn").onclick=()=>{
+  const en=clean($("newEn").value),tr=clean($("newTr").value);$("addErr").textContent="";
+  if(!en.length){$("addErr").textContent="İngilizce metin boş.";return}
+  if(tr.length&&tr.length!==en.length)$("addErr").textContent=`Uyarı: ${en.length} İngilizce ve ${tr.length} Türkçe paragraf var; eşleşme kayabilir.`;
+  addDoc({title:$("newTitle").value.trim()||"Metin "+(docs.length+1),paragraphs:en.map((e,i)=>({sec:"",en:e,tr:tr[i]||"",note:"",c:[]}))});
+  $("newEn").value=$("newTr").value=$("newTitle").value="";$("addBox").open=false;
+};
+$("pack").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{addDoc(validPack(JSON.parse(r.result)))}catch(err){$("addBox").open=true;$("addErr").textContent="Paket okunamadı: "+err.message}};r.readAsText(f);e.target.value=""};
+
+/* navigation */
+document.body.addEventListener("click",e=>{
+  const m=e.target.closest("mark");if(m){card(+m.dataset.i);return}
+  const s=e.target.closest(".s");if(s){if(s.dataset.l==="tr"&&$("trBox").classList.contains("hidden"))return;speak([{t:s.textContent,l:s.dataset.l,el:s}]);return}
+  const d=e.target.closest(".dot");if(d)go(+d.dataset.i);
+});
+document.body.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.matches("mark"))card(+e.target.dataset.i)});
+function go(i){if(i<0||i>=P().length)return;if(synth)synth.cancel();idx=i;pg().idx=i;saveProg();render();window.scrollTo({top:0})}
+$("prev").onclick=()=>go(idx-1);$("next").onclick=()=>go(idx+1);
+$("done").onclick=()=>{const D=pg().done,j=D.indexOf(idx);j>-1?D.splice(j,1):D.push(idx);saveProg();render()};
+$("hideTr").onclick=()=>{const h=$("trBox").classList.toggle("hidden");$("hideTr").setAttribute("aria-pressed",h);$("hideTr").textContent=h?"Türkçeyi göster":"Türkçeyi gizle"};
+$("trBox").addEventListener("click",()=>{if($("trBox").classList.contains("hidden"))$("hideTr").click()});
+document.addEventListener("keydown",e=>{if(e.target.matches("input,select,textarea"))return;if(e.key==="ArrowRight")go(idx+1);if(e.key==="ArrowLeft")go(idx-1)});
+open(cur);
+}
+</script>
+</body>
+</html>
