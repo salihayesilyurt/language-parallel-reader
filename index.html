@@ -14,6 +14,7 @@
 :root{color-scheme:light dark;--bg:light-dark(#ffffff,#161616);--ink:light-dark(#151515,#ececea);--mute:light-dark(#5d5d5a,#a3a39e);--line:light-dark(#d8d8d4,#33332f);--panel:light-dark(#f3f3f0,#1f1f1d);--hl:light-dark(#ffe600,#6b6200);--hlink:light-dark(#151515,#fff7a8);--now:light-dark(#e6eefc,#22304a)}
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
 *{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Hanken Grotesk",system-ui,sans-serif;overflow-x:clip}
 .wrap{max-width:1240px;margin:0 auto;padding:clamp(20px,3vw,40px) max(4vw,16px)}
 header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px;border-bottom:1px solid var(--line);padding-bottom:14px}
@@ -63,6 +64,8 @@ mark.learned{background:none;color:inherit;box-shadow:inset 0 -3px 0 var(--hl)}
 .empty{color:var(--mute);margin-top:22px}
 .warn{font-size:14px;color:var(--mute);margin-top:6px}
 .err{color:#c0281b;font-size:14px}
+.ok{color:light-dark(#1d6b35,#7fd69a)}
+input[type=checkbox]{width:20px;height:20px}
 footer{margin-top:28px;border-top:1px solid var(--line);padding-top:12px;font-size:13px;color:var(--mute)}
 @media(max-width:760px){.cols,.two{grid-template-columns:minmax(0,1fr)}.tr{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:14px}.page{font-size:18px}}
 @media(prefers-reduced-motion:reduce){.s{transition:none}}
@@ -85,11 +88,18 @@ footer{margin-top:28px;border-top:1px solid var(--line);padding-top:12px;font-si
 <details class="add" id="addBox">
   <summary>Yeni metin ekle (yapıştır)</summary>
   <input type="text" id="newTitle" placeholder="Başlık, ör. Makalem 2024" aria-label="Başlık">
+  <div class="bar">
+    <label class="file">İngilizce PDF seç<input type="file" id="pdfEn" accept="application/pdf,.pdf"></label>
+    <label class="file">Türkçe PDF seç<input type="file" id="pdfTr" accept="application/pdf,.pdf"></label>
+    <label class="rate"><input type="checkbox" id="skipRefs" checked> Kaynakçayı atla</label>
+    <span class="hint" id="pdfMsg"></span>
+  </div>
   <div class="two" style="margin-top:10px">
     <div><label for="newEn" class="hint">İngilizce metin</label><textarea id="newEn" placeholder="Paragrafları boş satırla ayırın."></textarea></div>
     <div><label for="newTr" class="hint">Türkçe metin (isteğe bağlı)</label><textarea id="newTr" placeholder="Aynı paragraf sırasıyla."></textarea></div>
   </div>
-  <p class="hint">Paragraflar boş satırla ayrılır. PDF'ten kopyalanan satır sonları ve satır sonu tireleri otomatik birleştirilir. Metin yalnızca bu tarayıcıda saklanır, hiçbir yere gönderilmez.</p>
+  <p class="hint" id="countMsg"></p>
+  <p class="hint">PDF seçince metin paragraflara ayrılıp aşağıya gelir; eklemeden önce kontrol edip düzeltebilirsin. Paragraflar boş satırla ayrılır; <b>## Başlık</b> satırı bir bölüm başlığıdır. Şekil, tablo ve denklemler atlanır. Taranmış (resim) PDF'lerde metin çıkmaz. Her şey tarayıcında işlenir, hiçbir yere gönderilmez.</p>
   <p class="err" id="addErr"></p>
   <div class="bar"><button class="primary" id="addBtn">Ekle ve aç</button></div>
 </details>
@@ -115,6 +125,21 @@ footer{margin-top:28px;border-top:1px solid var(--line);padding-top:12px;font-si
 </div>
 
 <div class="note" id="note"></div>
+<div class="bar">
+  <button id="addCard" disabled title="İngilizce metinde bir ifade seç">+ Seçili ifadeyi kalıp olarak ekle</button>
+  <span class="sp"></span>
+  <button id="dl">Paketi indir (JSON)</button>
+  <button id="cp">JSON'u kopyala</button>
+  <span class="hint" id="expMsg" aria-live="polite"></span>
+</div>
+<form id="cardForm" class="card" hidden>
+  <h3 id="cfP"></h3>
+  <label class="hint" for="cfTr">Türkçe anlamı</label><input type="text" id="cfTr">
+  <label class="hint" for="cfU">Kullanım notu</label><input type="text" id="cfU">
+  <label class="hint" for="cfEx">Kendi örnek cümlen</label><input type="text" id="cfEx">
+  <label class="hint" for="cfF">Yaygınlık</label><select id="cfF"><option value="3">Çok yaygın</option><option value="2" selected>Yaygın</option><option value="1">Üslup tercihi, daha seyrek</option></select>
+  <div class="row"><button class="primary" type="submit">Kaydet</button><button type="button" id="cfCancel">Vazgeç</button></div>
+</form>
 <div id="cardBox"></div>
 
 <div class="bar">
@@ -124,7 +149,7 @@ footer{margin-top:28px;border-top:1px solid var(--line);padding-top:12px;font-si
   <button id="done" aria-pressed="false">Bu paragrafı bitirdim</button>
 </div>
 
-<footer>Örnek metin bu uygulama için yazılmıştır. Sesler tarayıcının kendi sesleridir; Türkçe ses yoksa işletim sistemi ayarlarından eklenebilir. Kalıp kartları ve notlar JSON paketle gelir; biçim için README'ye bakın.</footer>
+<footer>Örnek metin bu uygulama için yazılmıştır. Sesler tarayıcının kendi sesleridir; Türkçe ses yoksa işletim sistemi ayarlarından eklenebilir. Kalıp kartlarını kendin ekleyebilir ya da hazır bir JSON paket yükleyebilirsin; biçim için README'ye bakın.</footer>
 </div>
 
 <script>
@@ -152,7 +177,13 @@ const P=()=>doc.paragraphs;
 const pg=()=>prog[doc.id]||(prog[doc.id]={idx:0,done:[],learned:[]});
 const saveProg=()=>store.set("pr_prog",prog);
 
-function clean(t){return t.replace(/\r/g,"").replace(/-\n(?=[a-zçğıöşü])/g,"").split(/\n\s*\n/).map(p=>p.replace(/\s*\n\s*/g," ").replace(/\s{2,}/g," ").trim()).filter(Boolean)}
+function clean(t){let sec="";const out=[];
+  t.replace(/\r/g,"").replace(/-\n(?=[a-zçğıöşü])/g,"").split(/\n\s*\n/).forEach(b=>{b=b.trim();if(!b)return;
+    const m=b.match(/^##\s*(.+?)(\n|$)/);if(m){sec=m[1].trim();b=b.slice(m[0].length).trim();if(!b)return}
+    out.push({sec,text:b.replace(/\s*\n\s*/g," ").replace(/\s{2,}/g," ").trim()})});return out}
+const toText=ps=>{let sec=null;return ps.map(p=>{let h="";if(p.sec&&p.sec!==sec){h="## "+p.sec+"\n\n";sec=p.sec}return h+p.text}).join("\n\n")};
+function counts(){const e=clean($("newEn").value).length,t=clean($("newTr").value).length;const m=$("countMsg");
+  m.className="hint "+(e&&t&&e!==t?"err":e&&t?"ok":"");m.textContent=e?`İngilizce: ${e} paragraf`+(t?` · Türkçe: ${t} paragraf`+(e===t?" · eşleşiyor":" · sayılar farklı, eşleştirmeyi kontrol et"):""):""}
 const split=t=>t.split(/(?<=[.!?])\s+(?=[A-ZÇĞİÖŞÜ“"(])/);
 
 function validPack(o){
@@ -195,7 +226,8 @@ function card(i){
     ${c.alt?`<p><b>Alternatifler:</b> ${rich(c.alt)}</p>`:""}
     ${c.ex?`<p class="ex">“${esc(c.ex)}”</p>`:""}
     ${c.src?`<p><a href="${esc(c.src.u)}" target="_blank" rel="noopener">${esc(c.src.t)}</a></p>`:c.ex?`<p class="warn">Örnek cümle bir şablondur, alıntı değildir.</p>`:""}
-    <div class="row"><button id="sayP">▶ Kalıbı dinle</button>${c.ex?`<button id="sayX">▶ Örneği dinle</button>`:""}<button id="lrn" aria-pressed="${L.includes(key)}">${L.includes(key)?"✓ Öğrendim":"Öğrendim olarak işaretle"}</button></div></div>`;
+    <div class="row"><button id="sayP">▶ Kalıbı dinle</button>${c.ex?`<button id="sayX">▶ Örneği dinle</button>`:""}<button id="lrn" aria-pressed="${L.includes(key)}">${L.includes(key)?"✓ Öğrendim":"Öğrendim olarak işaretle"}</button>${doc.id!=="sample"?`<button id="rmC">Kartı sil</button>`:""}</div></div>`;
+  if($("rmC"))$("rmC").onclick=()=>{P()[idx].c.splice(i,1);pg().learned=[];saveProg();store.set("pr_docs",docs);render()};
   $("sayP").onclick=()=>speak([{t:c.p,l:"en"}]);
   if(c.ex)$("sayX").onclick=()=>speak([{t:c.ex,l:"en"}]);
   $("lrn").onclick=()=>{const j=L.indexOf(key);j>-1?L.splice(j,1):L.push(key);saveProg();const ci=curCard;render();card(ci)};
@@ -232,11 +264,114 @@ $("addBtn").onclick=()=>{
   const en=clean($("newEn").value),tr=clean($("newTr").value);$("addErr").textContent="";
   if(!en.length){$("addErr").textContent="İngilizce metin boş.";return}
   if(tr.length&&tr.length!==en.length)$("addErr").textContent=`Uyarı: ${en.length} İngilizce ve ${tr.length} Türkçe paragraf var; eşleşme kayabilir.`;
-  addDoc({title:$("newTitle").value.trim()||"Metin "+(docs.length+1),paragraphs:en.map((e,i)=>({sec:"",en:e,tr:tr[i]||"",note:"",c:[]}))});
-  $("newEn").value=$("newTr").value=$("newTitle").value="";$("addBox").open=false;
+  addDoc({title:$("newTitle").value.trim()||"Metin "+(docs.length+1),paragraphs:en.map((e,i)=>({sec:e.sec||(tr[i]&&tr[i].sec)||"",en:e.text,tr:tr[i]?tr[i].text:"",note:"",c:[]}))});
+  $("newEn").value=$("newTr").value=$("newTitle").value="";counts();$("addBox").open=false;
 };
 $("pack").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{try{addDoc(validPack(JSON.parse(r.result)))}catch(err){$("addBox").open=true;$("addErr").textContent="Paket okunamadı: "+err.message}};r.readAsText(f);e.target.value=""};
+
+/* pdf */
+// shared extraction logic: async extractParas(pdf, {skipRefs}) -> [{sec,text}]
+async function extractParas(pdf,opt){
+  opt=opt||{};const lines=[];
+  for(let n=1;n<=pdf.numPages;n++){
+    const page=await pdf.getPage(n);const tc=await page.getTextContent();
+    const its=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({s:i.str,x:i.transform[4],y:i.transform[5],h:Math.abs(i.transform[3])||i.height||10,w:i.width||0}));
+    its.sort((a,b)=>b.y-a.y||a.x-b.x);
+    const hs={};its.forEach(i=>{const k=Math.round(i.h);hs[k]=(hs[k]||0)+i.s.length});
+    const pb=+(Object.entries(hs).sort((a,b)=>b[1]-a[1])[0]||[10])[0];
+    const caps=its.filter(i=>i.s.trim().length<=2&&i.h>pb*1.8&&/\p{L}/u.test(i.s));
+    const rest=its.filter(i=>!caps.includes(i));
+    // two-column detection: few items cross the page middle, both halves carry text
+    const vw=page.view?page.view[2]-page.view[0]:612,mid=(page.view?page.view[0]:0)+vw/2;
+    let cl=0,cr=0,cx=0;rest.forEach(i=>{const n=i.s.length;if(i.x<mid-4&&i.x+i.w>mid+4)cx+=n;else if(i.x+i.w<=mid+4)cl+=n;else cr+=n});
+    const tot=cl+cr+cx||1,twoCol=cx/tot<0.12&&cl/tot>0.25&&cr/tot>0.25;
+    const streams=twoCol?[rest.filter(i=>i.x<mid-4),rest.filter(i=>i.x>=mid-4)]:[rest];
+    const pl=[];
+    for(const stream of streams){const spl=[];
+    for(const it of stream){const L=spl.find(l=>Math.abs(l.y-it.y)<Math.max(2,Math.min(l.h,it.h)*0.5));
+      if(L){L.items.push(it);L.h=Math.max(L.h,it.h)}else spl.push({y:it.y,h:it.h,items:[it],page:n,col:streams.indexOf(stream)})}
+    spl.sort((a,b)=>b.y-a.y);pl.push(...spl)}
+    for(const l of pl){l.items.sort((a,b)=>a.x-b.x);let t="",end=null,mg=0;
+      for(const it of l.items){if(end!==null){const g=it.x-end;if(it.s.trim())mg=Math.max(mg,g);if(g>l.h*0.12&&!/\s$/.test(t)&&!/^\s/.test(it.s))t+=" "}t+=it.s;end=it.x+it.w}
+      l.text=t.replace(/\s+/g," ").trim();l.x=l.items[0].x;l.xEnd=end;l.table=mg>l.h*2.0;}
+    for(const c of caps){const tgt=pl.filter(l=>l.y<=c.y+c.h&&l.y>=c.y-2&&l.x>=c.x+c.w*0.5);if(!tgt.length)continue;
+      tgt.forEach(l=>l.capArea=true);const first=tgt[0];first.text=c.s.trim()+first.text;first.dropcap=true}lines.push(...pl.filter(l=>l.text));
+  }
+  // running heads / page numbers
+  const norm=t=>t.replace(/[^\p{L}]+/gu,"").toLowerCase();
+  const pagesOf={};lines.forEach(l=>{const k=norm(l.text);(pagesOf[k]=pagesOf[k]||new Set()).add(l.page)});
+  let L=lines.filter(l=>{const k=norm(l.text);if(!k)return false;if(pagesOf[k].size>=3&&l.text.length<120)return false;return true});
+  // body size
+  const hc={};L.forEach(l=>{const k=Math.round(l.h);hc[k]=(hc[k]||0)+l.text.length});
+  const body=+Object.entries(hc).sort((a,b)=>b[1]-a[1])[0][0];
+  const left={},right={};L.forEach(l=>{l.k=l.page+":"+(l.col||0);if(Math.abs(l.h-body)<1.5){left[l.k]=Math.min(left[l.k]??1e9,l.x);right[l.k]=Math.max(right[l.k]??0,l.xEnd)}});
+  const gaps=[];for(let i=1;i<L.length;i++)if(L[i].k===L[i-1].k){const g=L[i-1].y-L[i].y;if(g>0)gaps.push(g)}
+  gaps.sort((a,b)=>a-b);const lg=gaps[Math.floor(gaps.length/2)]||body*1.4;
+  const isHead=l=>l.text.length<90&&!/[.,;:]$/.test(l.text)&&(l.h>body*1.15||/^(\d+(\.\d+)*\.?|[IVX]+\.)\s+\S/.test(l.text))&&!/^\d+(\.\d+)*$/.test(l.text);
+  const refRe=/^(\d+\.?\s*)?(references|bibliography|kaynakça|kaynaklar)$/i;
+  const out=[];let cur=null,sec="",prev=null,cap=false,capH=0;
+  const flush=()=>{if(cur&&cur.text.trim())out.push(cur);cur=null};
+  for(const l of L){
+    if(refRe.test(l.text)){if(opt.skipRefs!==false){flush();break}}
+    if(l.table){flush();prev=null;continue}
+    if(/^(figure|fig\.|şekil|table|tablo)\s*\d+/i.test(l.text)){flush();cap=true;capH=l.h;prev=l;continue}
+    if(cap){if(prev&&prev.k===l.k&&prev.y-l.y<=lg*1.15&&Math.abs(l.h-capH)<0.3&&!isHead(l)){prev=l;continue}cap=false;prev=null}
+    if(isHead(l)){flush();sec=l.text;prev=null;continue}
+    if(Math.abs(l.h-body)>body*0.35&&!l.dropcap){continue} // other sizes: superscripts, footnotes
+    let brk=!cur;
+    if(prev&&!brk){
+      const samePage=prev.k===l.k;
+      if(samePage&&prev.y-l.y>lg*1.6)brk=true;
+      if(l.x>(left[l.k]??l.x)+6&&!l.capArea)brk=true;
+      const W=(right[prev.k]-left[prev.k])||1;
+      if(samePage&&/[.!?:]["”)]?$/.test(prev.text)&&prev.xEnd<right[prev.k]-W*0.12)brk=true;
+    }
+    if(brk){flush();cur={sec,text:l.text}}
+    else{const t=cur.text;cur.text=/[a-zçğıöşü]-$/.test(t)&&/^[a-zçğıöşü]/.test(l.text)?t.slice(0,-1)+l.text:t+" "+l.text}
+    prev=l;
+  }
+  flush();
+  // drop "Figure/Şekil/Table/Tablo N." caption paragraphs and lone numbers
+  return out.filter(p=>p.text.length>25&&!(p.text.length<120&&!/[.!?:;,]["”)]?$/.test(p.text)));
+}
+
+
+let pdfLib=null;
+function loadPdfJs(){if(pdfLib)return Promise.resolve(pdfLib);return new Promise((ok,no)=>{const sc=document.createElement("script");
+  sc.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+  sc.onload=()=>{pdfLib=window.pdfjsLib;pdfLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";ok(pdfLib)};
+  sc.onerror=()=>no(new Error("PDF kütüphanesi yüklenemedi (internet bağlantısını kontrol et)."));document.head.appendChild(sc)})}
+async function readPdf(file,target){
+  const msg=$("pdfMsg");msg.className="hint";msg.textContent=file.name+" okunuyor…";
+  try{const lib=await loadPdfJs();const pdf=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+    const ps=await extractParas(pdf,{skipRefs:$("skipRefs").checked});
+    if(!ps.length)throw new Error("Metin bulunamadı. PDF taranmış bir görüntü olabilir.");
+    $(target).value=toText(ps);if(!$("newTitle").value)$("newTitle").value=file.name.replace(/\.pdf$/i,"").replace(/[_-]+/g," ").slice(0,80);
+    msg.textContent=`${file.name}: ${ps.length} paragraf çıkarıldı.`;counts()}
+  catch(err){msg.className="err";msg.textContent="PDF okunamadı: "+err.message}}
+$("pdfEn").onchange=e=>{const f=e.target.files[0];if(f)readPdf(f,"newEn");e.target.value=""};
+$("pdfTr").onchange=e=>{const f=e.target.files[0];if(f)readPdf(f,"newTr");e.target.value=""};
+$("newEn").oninput=counts;$("newTr").oninput=counts;
+
+/* own cards */
+let selText="";
+document.addEventListener("selectionchange",()=>{const sel=getSelection();const t=sel&&sel.toString().replace(/\s+/g," ").trim();
+  const inEn=sel&&sel.rangeCount&&$("en").contains(sel.getRangeAt(0).commonAncestorContainer);
+  if(inEn&&t&&t.length<=160){selText=t;$("addCard").disabled=false;$("addCard").textContent=`+ "${t.length>40?t.slice(0,40)+"…":t}" kalıp olarak ekle`}
+  else if(!$("cardForm").contains(document.activeElement)&&document.activeElement!==$("addCard")){$("addCard").disabled=true;$("addCard").textContent="+ Seçili ifadeyi kalıp olarak ekle"}});
+$("addCard").onclick=()=>{if(!selText)return;if(doc.id==="sample"){$("expMsg").textContent="Örnek metne kalıp eklenemez; önce kendi metnini ekle.";return}
+  $("cfP").textContent=selText;["cfTr","cfU","cfEx"].forEach(i=>$(i).value="");$("cardForm").hidden=false;$("cfTr").focus()};
+$("cfCancel").onclick=()=>{$("cardForm").hidden=true};
+$("cardForm").onsubmit=e=>{e.preventDefault();const p=P()[idx];
+  p.c.push({p:$("cfP").textContent,tr:$("cfTr").value.trim(),f:+$("cfF").value,u:$("cfU").value.trim(),alt:"",ex:$("cfEx").value.trim(),src:null,own:true});
+  store.set("pr_docs",docs);$("cardForm").hidden=true;const ci=p.c.length-1;render();card(ci)};
+
+/* export */
+const packJson=()=>JSON.stringify({title:doc.title,paragraphs:P().map(p=>({sec:p.sec,en:p.en,tr:p.tr,note:p.note,c:p.c.map(({own,...c})=>c)}))},null,1);
+$("dl").onclick=()=>{try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([packJson()],{type:"application/json"}));
+  a.download=(doc.title||"paket").replace(/[^\p{L}\d]+/gu,"-").toLowerCase()+".json";document.body.appendChild(a);a.click();a.remove();$("expMsg").textContent="İndirme başlatıldı. Açılmadıysa 'JSON'u kopyala'yı kullan."}catch(e){$("expMsg").textContent="İndirme bu ortamda engellendi; 'JSON'u kopyala'yı kullan."}};
+$("cp").onclick=async()=>{try{await navigator.clipboard.writeText(packJson());$("expMsg").textContent="Kopyalandı."}catch(e){$("expMsg").textContent="Kopyalanamadı (tarayıcı izin vermedi)."}};
 
 /* navigation */
 document.body.addEventListener("click",e=>{
